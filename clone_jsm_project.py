@@ -70,7 +70,8 @@ class JiraClient:
 
     def get(self, path: str, api: str = "api/3", params: dict = None) -> dict:
         r = requests.get(
-            self._url(path, api), auth=self.auth, headers=self.headers, params=params
+            self._url(path, api), auth=self.auth, headers=self.headers, params=params,
+            timeout=30,
         )
         r.raise_for_status()
         return r.json()
@@ -80,7 +81,8 @@ class JiraClient:
             log.info("[DRY RUN] Would POST /%s/  %s", path, json.dumps(data))
             return {"id": "0", "key": data.get("key", "DRY_RUN")}
         r = requests.post(
-            self._url(path, api), auth=self.auth, headers=self.headers, json=data
+            self._url(path, api), auth=self.auth, headers=self.headers, json=data,
+            timeout=30,
         )
         if not r.ok:
             log.error("POST %s failed %s: %s", path, r.status_code, r.text)
@@ -98,8 +100,12 @@ class JiraClient:
         results = []
         start = 0
         limit = 50
+        is_jsm = api.startswith("servicedeskapi")
         while True:
-            p = {**(params or {}), "startAt": start, "maxResults": limit}
+            if is_jsm:
+                p = {**(params or {}), "start": start, "limit": limit}
+            else:
+                p = {**(params or {}), "startAt": start, "maxResults": limit}
             data = self.get(path, api=api, params=p)
             page = data.get(result_key, data.get("values", []))
             results.extend(page)

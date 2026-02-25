@@ -75,7 +75,7 @@ The following cannot be automated due to Jira Cloud API limitations:
 
 ## Output files
 
-When queues or SLA metadata cannot be created via API, the script writes reference files to `--output-dir`:
+Because no public API exists to create queues or SLA configurations, the script always writes these reference files to `--output-dir`:
 
 - `queues_config.json` — full queue definitions including names and JQL filters
 - `sla_fields.json` — SLA field metadata
