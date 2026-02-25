@@ -56,9 +56,10 @@ log = logging.getLogger(__name__)
 
 
 class JiraClient:
-    def __init__(self, domain: str, email: str, token: str):
+    def __init__(self, domain: str, email: str, token: str, dry_run: bool = False):
         self.base = f"https://{domain}.atlassian.net"
         self.auth = HTTPBasicAuth(email, token)
+        self.dry_run = dry_run
         self.headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -75,6 +76,9 @@ class JiraClient:
         return r.json()
 
     def post(self, path: str, data: dict, api: str = "api/3") -> dict:
+        if self.dry_run:
+            log.info("[DRY RUN] Would POST /%s/  %s", path, json.dumps(data))
+            return {"id": "0", "key": data.get("key", "DRY_RUN")}
         r = requests.post(
             self._url(path, api), auth=self.auth, headers=self.headers, json=data
         )
@@ -328,16 +332,20 @@ class JSMCloner:
         dst_project_id = dst["id"]
 
         # Get destination service desk ID (created automatically with the project)
-        try:
-            self.dst_sd_id = self._get_sd_id(self.dst)
-            log.info("Destination service desk ID: %s", self.dst_sd_id)
-        except ValueError as e:
-            log.error(
-                "Could not find new service desk — Jira may still be provisioning it. "
-                "Wait a few seconds and re-run with --skip-project. Error: %s",
-                e,
-            )
-            sys.exit(1)
+        if self.j.dry_run:
+            self.dst_sd_id = "0"
+            log.info("[DRY RUN] Skipping destination service desk lookup (project not created)")
+        else:
+            try:
+                self.dst_sd_id = self._get_sd_id(self.dst)
+                log.info("Destination service desk ID: %s", self.dst_sd_id)
+            except ValueError as e:
+                log.error(
+                    "Could not find new service desk — Jira may still be provisioning it. "
+                    "Wait a few seconds and re-run with --skip-project. Error: %s",
+                    e,
+                )
+                sys.exit(1)
 
         self._clone_components()
         self._clone_versions(dst_project_id)
@@ -409,6 +417,12 @@ def main():
         metavar="DIR",
         help="Directory to write exported config files (default: current dir)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Read source data and log what would be created, without making any changes",
+    )
 
     args = parser.parse_args()
 
@@ -422,7 +436,10 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    client = JiraClient(args.domain, args.email, token)
+    if args.dry_run:
+        log.info("DRY RUN mode — no changes will be made to Jira")
+
+    client = JiraClient(args.domain, args.email, token, dry_run=args.dry_run)
     cloner = JSMCloner(
         client,
         src_key=args.source,
