@@ -26,6 +26,15 @@ python clone_jsm_project.py \
   --dest-key SUPPORTTEST \
   --dest-name "Support [TEST]" \
   --output-dir ./jsm-clone-output
+
+# Preview what would be created without making any changes
+python clone_jsm_project.py \
+  --domain mycompany \
+  --email admin@mycompany.com \
+  --source SUPPORT \
+  --dest-key SUPPORTTEST \
+  --dest-name "Support [TEST]" \
+  --dry-run
 ```
 
 ### Arguments
@@ -39,6 +48,7 @@ python clone_jsm_project.py \
 | `--dest-key` | Yes | New project key (e.g. `SUPPORTTEST`) |
 | `--dest-name` | Yes | New project display name (e.g. `"Support [TEST]"`) |
 | `--output-dir` | No | Directory for exported config files (default: `.`) |
+| `--dry-run` | No | Preview mode: reads source and logs would-be writes without making any changes |
 
 ## What gets cloned
 

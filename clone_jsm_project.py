@@ -103,9 +103,14 @@ class JiraClient:
             data = self.get(path, api=api, params=p)
             page = data.get(result_key, data.get("values", []))
             results.extend(page)
-            if data.get("isLast", True) or len(page) < limit:
+            # JSM endpoints use "isLastPage"; Jira REST v3 uses "isLast"
+            is_last = data.get("isLastPage", data.get("isLast"))
+            if is_last is not None:
+                if is_last:
+                    break
+            elif len(page) < limit:
                 break
-            start += limit
+            start += len(page)
         return results
 
 
@@ -135,8 +140,8 @@ class JSMCloner:
         return os.path.join(self.output_dir, filename)
 
     def _get_sd_id(self, project_key: str) -> str:
-        data = self.j.get("servicedesk", api="servicedeskapi")
-        for desk in data.get("values", []):
+        desks = self.j.paginate("servicedesk", api="servicedeskapi", result_key="values")
+        for desk in desks:
             if desk["projectKey"] == project_key:
                 return str(desk["id"])
         raise ValueError(f"No service desk found for project key: {project_key}")
@@ -342,7 +347,7 @@ class JSMCloner:
             except ValueError as e:
                 log.error(
                     "Could not find new service desk — Jira may still be provisioning it. "
-                    "Wait a few seconds and re-run with --skip-project. Error: %s",
+                    "Wait a few seconds and re-run. Error: %s",
                     e,
                 )
                 sys.exit(1)
@@ -356,8 +361,8 @@ class JSMCloner:
         log.info("")
         log.info("=" * 60)
         log.info("Clone complete.")
-        log.info("  Source  : https://your-domain.atlassian.net/jira/servicedesk/projects/%s", self.src)
-        log.info("  New     : https://your-domain.atlassian.net/jira/servicedesk/projects/%s", self.dst)
+        log.info("  Source  : %s/jira/servicedesk/projects/%s", self.j.base, self.src)
+        log.info("  New     : %s/jira/servicedesk/projects/%s", self.j.base, self.dst)
         log.info("")
         log.info("Remaining manual steps:")
         log.info("  1. SLAs          → recreate from sla_fields.json")
